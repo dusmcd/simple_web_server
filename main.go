@@ -19,9 +19,10 @@ func runServer() error {
 	}
 
 	serveMux.Handle("GET /app/*", config.middlewareMetricsInc(fileServerHandler()))
-	serveMux.HandleFunc("GET /healthz", handler)
-	serveMux.HandleFunc("GET /metrics", config.showMetricsHandler)
-	serveMux.HandleFunc("GET /reset", config.resetMetricsHandler)
+	serveMux.HandleFunc("GET /api/healthz", readinessHandler)
+	serveMux.HandleFunc("GET /admin/metrics", config.showMetricsHandler)
+	serveMux.HandleFunc("GET /api/reset", config.resetMetricsHandler)
+	serveMux.HandleFunc("POST /api/validate_chirp", validateHandler)
 
 	server := &http.Server{
 		Addr:    "localhost:8080",
