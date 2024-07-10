@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type apiConfig struct {
@@ -56,7 +57,8 @@ func validateHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	type response struct {
-		Valid bool `json:"valid"`
+		Valid       bool   `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	if len(params.Body) > 140 {
@@ -64,7 +66,9 @@ func validateHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, 200, response{Valid: true})
+	cleanBody := cleanMessage(params.Body)
+
+	respondWithJSON(w, 200, response{Valid: true, CleanedBody: cleanBody})
 }
 
 func respondWithError(w http.ResponseWriter, statusCode int, msg string) {
@@ -95,4 +99,23 @@ func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{})
 	w.WriteHeader(statusCode)
 	w.Write(data)
 
+}
+
+func cleanMessage(body string) string {
+	badWords := [3]string{"kerfuffle", "sharbert", "fornax"}
+	words := strings.Split(body, " ")
+	cleanBody := make([]string, len(words))
+	for i, word := range words {
+		result := ""
+		for _, badWord := range badWords {
+			if strings.ToLower(word) == badWord {
+				result = "****"
+				break
+			} else {
+				result = word
+			}
+		}
+		cleanBody[i] = result
+	}
+	return strings.Join(cleanBody, " ")
 }
