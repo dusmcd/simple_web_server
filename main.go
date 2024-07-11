@@ -22,7 +22,8 @@ func runServer() error {
 	serveMux.HandleFunc("GET /api/healthz", readinessHandler)
 	serveMux.HandleFunc("GET /admin/metrics", config.showMetricsHandler)
 	serveMux.HandleFunc("GET /api/reset", config.resetMetricsHandler)
-	serveMux.HandleFunc("POST /api/validate_chirp", validateHandler)
+	serveMux.HandleFunc("POST /api/chirps", saveChirpsHandler)
+	serveMux.HandleFunc("GET /api/chirps", getChirpsHandler)
 
 	server := &http.Server{
 		Addr:    "localhost:8080",

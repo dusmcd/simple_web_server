@@ -43,7 +43,7 @@ func fileServerHandler() http.Handler {
 	return http.StripPrefix("/app", fileServer)
 }
 
-func validateHandler(w http.ResponseWriter, req *http.Request) {
+func saveChirpsHandler(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
 	}
@@ -56,9 +56,10 @@ func validateHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	type response struct {
-		Valid       bool   `json:"valid"`
-		CleanedBody string `json:"cleaned_body"`
+	db, err := NewDB("database.json")
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
 	}
 
 	if len(params.Body) > 140 {
@@ -66,9 +67,50 @@ func validateHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	cleanBody := cleanMessage(params.Body)
+	chirp, err := saveToDB(db, params.Body)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
 
-	respondWithJSON(w, 200, response{Valid: true, CleanedBody: cleanBody})
+	//cleanBody := cleanMessage(params.Body)
+
+	respondWithJSON(w, 201, chirp)
+}
+
+func getChirpsHandler(w http.ResponseWriter, req *http.Request) {
+	db, err := NewDB("database.json")
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	chirps, err := db.GetChirps()
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	respondWithJSON(w, 200, chirps)
+}
+
+func saveToDB(db *DB, body string) (Chirp, error) {
+	chirp, err := db.CreateChirp(body)
+	if err != nil {
+		return Chirp{}, err
+	}
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return Chirp{}, err
+	}
+	dbStructure.Chirps[chirp.ID] = chirp
+	// concurrently write updated dbStructure to disk using write function
+	err = db.WriteDB(dbStructure)
+	if err != nil {
+		return Chirp{}, err
+	}
+
+	return chirp, nil
 }
 
 func respondWithError(w http.ResponseWriter, statusCode int, msg string) {
@@ -81,7 +123,7 @@ func respondWithError(w http.ResponseWriter, statusCode int, msg string) {
 	data, err := json.Marshal(response)
 	if err != nil {
 		log.Print(err)
-		respondWithError(w, 500, "error marshalling json")
+		w.WriteHeader(500)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
