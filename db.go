@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"sort"
+	"strconv"
 	"sync"
 )
 
@@ -18,8 +21,14 @@ type Chirp struct {
 	Body string `json:"body"`
 }
 
+type User struct {
+	ID    int    `json:"id"`
+	Email string `json:"email"`
+}
+
 type DBStructure struct {
 	Chirps map[int]Chirp `json:"chirps"`
+	Users  map[int]User  `json:"users"`
 }
 
 func NewDB(path string) (*DB, error) {
@@ -60,6 +69,7 @@ func (db *DB) LoadDB() (DBStructure, error) {
 	}
 	dbStructure := DBStructure{
 		Chirps: make(map[int]Chirp),
+		Users:  make(map[int]User),
 	}
 	if len(fileContent) == 0 {
 		return dbStructure, nil
@@ -95,6 +105,7 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 		chirps = append(chirps, dbStructure.Chirps[id])
 	}
 
+	sort.Slice(chirps, func(i, j int) bool { return chirps[i].ID < chirps[j].ID })
 	return chirps, nil
 }
 
@@ -110,4 +121,39 @@ func (db *DB) WriteDB(dbStructure DBStructure) error {
 		return err
 	}
 	return nil
+}
+
+func (db *DB) GetChirpById(id string) (Chirp, error) {
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return Chirp{}, err
+	}
+
+	integerId, err := strconv.Atoi(id)
+	if err != nil {
+		return Chirp{}, err
+	}
+
+	chirp, found := dbStructure.Chirps[integerId]
+	if !found {
+		return Chirp{}, errors.New("Chirp not found")
+	}
+
+	return chirp, nil
+
+}
+
+func (db *DB) CreateUser(email string) (User, error) {
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	id := len(dbStructure.Users) + 1
+	user := User{
+		ID:    id,
+		Email: email,
+	}
+
+	return user, nil
 }

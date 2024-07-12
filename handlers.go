@@ -97,3 +97,55 @@ func (config *apiConfig) getChirpsHandler(w http.ResponseWriter, req *http.Reque
 
 	respondWithJSON(w, 200, chirps)
 }
+
+/*
+route: /api/chirps/{chirpID}
+method: GET
+*/
+func (config *apiConfig) getChirpByIdHandler(w http.ResponseWriter, req *http.Request) {
+	chirpID := req.PathValue("chirpID")
+	chirp, err := config.db.GetChirpById(chirpID)
+	if err != nil {
+		if err.Error() == "Chirp not found" {
+			respondWithError(w, 404, err.Error())
+			return
+		}
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	respondWithJSON(w, 200, chirp)
+}
+
+/*
+route: /api/users
+method: POST
+*/
+func (config *apiConfig) saveUserHandler(w http.ResponseWriter, req *http.Request) {
+	params, err := decodeJSON(req)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	user, err := config.db.CreateUser(params.Email)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	dbStructure, err := config.db.LoadDB()
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	dbStructure.Users[user.ID] = user
+	err = config.db.WriteDB(dbStructure)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	respondWithJSON(w, 201, user)
+}

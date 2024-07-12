@@ -8,7 +8,8 @@ import (
 )
 
 type parameters struct {
-	Body string `json:"body"`
+	Body  string `json:"body"`
+	Email string `json:"email"`
 }
 
 func saveToDB(db *DB, body string) (Chirp, error) {
