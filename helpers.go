@@ -8,8 +8,9 @@ import (
 )
 
 type parameters struct {
-	Body  string `json:"body"`
-	Email string `json:"email"`
+	Body     string `json:"body"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 func saveToDB(db *DB, body string) (Chirp, error) {
@@ -22,7 +23,7 @@ func saveToDB(db *DB, body string) (Chirp, error) {
 		return Chirp{}, err
 	}
 	dbStructure.Chirps[chirp.ID] = chirp
-	// concurrently write updated dbStructure to disk using write function
+
 	err = db.WriteDB(dbStructure)
 	if err != nil {
 		return Chirp{}, err

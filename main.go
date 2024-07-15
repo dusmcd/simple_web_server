@@ -49,4 +49,5 @@ func registerHandlers(serveMux *http.ServeMux, config *apiConfig) {
 	serveMux.HandleFunc("GET /api/chirps", config.getChirpsHandler)
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}", config.getChirpByIdHandler)
 	serveMux.HandleFunc("POST /api/users", config.saveUserHandler)
+	serveMux.HandleFunc("POST /api/login", config.loginUsersHandler)
 }

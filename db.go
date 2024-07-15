@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type DB struct {
@@ -22,8 +24,9 @@ type Chirp struct {
 }
 
 type User struct {
-	ID    int    `json:"id"`
-	Email string `json:"email"`
+	ID       int    `json:"id"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type DBStructure struct {
@@ -112,7 +115,6 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 func (db *DB) WriteDB(dbStructure DBStructure) error {
 	data, err := json.Marshal(dbStructure)
 	if err != nil {
-		log.Println("JSON error! from WriteDB function")
 		return err
 	}
 
@@ -143,16 +145,31 @@ func (db *DB) GetChirpById(id string) (Chirp, error) {
 
 }
 
-func (db *DB) CreateUser(email string) (User, error) {
+func (db *DB) CreateUser(email, password string) (User, error) {
 	dbStructure, err := db.LoadDB()
 	if err != nil {
 		return User{}, err
 	}
 
 	id := len(dbStructure.Users) + 1
+
+	// make sure duplicate emails are not created
+	for id := range dbStructure.Users {
+		if dbStructure.Users[id].Email == email {
+			return User{}, errors.New("the provided email has already been registered")
+		}
+	}
+	// hash password for storage
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 5)
+
+	if err != nil {
+		return User{}, err
+	}
+
 	user := User{
-		ID:    id,
-		Email: email,
+		ID:       id,
+		Email:    email,
+		Password: string(hashedPassword),
 	}
 
 	return user, nil

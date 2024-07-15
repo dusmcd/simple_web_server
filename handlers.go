@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type apiConfig struct {
@@ -128,8 +130,12 @@ func (config *apiConfig) saveUserHandler(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	user, err := config.db.CreateUser(params.Email)
+	user, err := config.db.CreateUser(params.Email, params.Password)
 	if err != nil {
+		if err.Error() == "the provided email has already been registered" {
+			respondWithError(w, 401, err.Error())
+			return
+		}
 		respondWithError(w, 500, err.Error())
 		return
 	}
@@ -147,5 +153,59 @@ func (config *apiConfig) saveUserHandler(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	respondWithJSON(w, 201, user)
+	// removing password from response
+	response := struct {
+		ID    int    `json:"id"`
+		Email string `json:"email"`
+	}{
+		ID:    user.ID,
+		Email: user.Email,
+	}
+	respondWithJSON(w, 201, response)
+}
+
+func (config *apiConfig) loginUsersHandler(w http.ResponseWriter, req *http.Request) {
+	params, err := decodeJSON(req)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	// load DB into memory
+	dbStructure, err := config.db.LoadDB()
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	foundUser := User{}
+	found := false
+
+	for id := range dbStructure.Users {
+		if params.Email == dbStructure.Users[id].Email {
+			foundUser = dbStructure.Users[id]
+			found = true
+			break
+		}
+	}
+	if !found {
+		respondWithError(w, 404, "user not found")
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(params.Password))
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	response := struct {
+		ID    int    `json:"id"`
+		Email string `json:"email"`
+	}{
+		ID:    foundUser.ID,
+		Email: foundUser.Email,
+	}
+
+	respondWithJSON(w, 200, response)
 }
