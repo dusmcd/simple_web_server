@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -13,7 +14,7 @@ type parameters struct {
 	Password string `json:"password"`
 }
 
-func saveToDB(db *DB, body string) (Chirp, error) {
+func saveChirpToDB(db *DB, body string) (Chirp, error) {
 	chirp, err := db.CreateChirp(body)
 	if err != nil {
 		return Chirp{}, err
@@ -94,5 +95,49 @@ func decodeJSON(req *http.Request) (parameters, error) {
 	}
 
 	return params, nil
+
+}
+
+func saveUserToDB(db *DB, email, password string) (User, error) {
+	user, err := db.CreateUser(email, password)
+	if err != nil {
+		return User{}, err
+	}
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	dbStructure.Users[user.ID] = user
+	err = db.WriteDB(dbStructure)
+	if err != nil {
+		return User{}, err
+	}
+
+	return user, nil
+
+}
+
+func findUser(db *DB, email string) (User, error) {
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	foundUser := User{}
+	found := false
+
+	for id := range dbStructure.Users {
+		if email == dbStructure.Users[id].Email {
+			foundUser = dbStructure.Users[id]
+			found = true
+			break
+		}
+	}
+	if !found {
+		return User{}, errors.New("user not found")
+	}
+
+	return foundUser, nil
 
 }

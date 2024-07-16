@@ -20,12 +20,12 @@ method: GET
 func (config *apiConfig) showMetricsHandler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/html")
-	html := fmt.Sprintf(`<html>
+	html := fmt.Sprintf(`<!DOCTYPE html><html>
 		<body>
 			<h1>Welcome, Chirpy Admin</h1>
 			<p>Chirpy has been visited %d times!</p>
 		</body>	
-	</html`, config.fileServerHits)
+	</html>`, config.fileServerHits)
 	w.Write([]byte(html))
 }
 
@@ -63,6 +63,10 @@ func fileServerHandler() http.Handler {
 /*
 route: /api/chirps
 method: POST
+
+	req body shape: {
+		body string
+	}
 */
 func (config *apiConfig) saveChirpsHandler(w http.ResponseWriter, req *http.Request) {
 	params, err := decodeJSON(req)
@@ -77,7 +81,7 @@ func (config *apiConfig) saveChirpsHandler(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	chirp, err := saveToDB(config.db, cleanMessage(params.Body))
+	chirp, err := saveChirpToDB(config.db, cleanMessage(params.Body))
 	if err != nil {
 		respondWithError(w, 500, err.Error())
 		return
@@ -122,6 +126,11 @@ func (config *apiConfig) getChirpByIdHandler(w http.ResponseWriter, req *http.Re
 /*
 route: /api/users
 method: POST
+
+	req body shape: {
+		email string
+		password string
+	}
 */
 func (config *apiConfig) saveUserHandler(w http.ResponseWriter, req *http.Request) {
 	params, err := decodeJSON(req)
@@ -130,25 +139,12 @@ func (config *apiConfig) saveUserHandler(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	user, err := config.db.CreateUser(params.Email, params.Password)
+	user, err := saveUserToDB(config.db, params.Email, params.Password)
 	if err != nil {
 		if err.Error() == "the provided email has already been registered" {
 			respondWithError(w, 401, err.Error())
 			return
 		}
-		respondWithError(w, 500, err.Error())
-		return
-	}
-
-	dbStructure, err := config.db.LoadDB()
-	if err != nil {
-		respondWithError(w, 500, err.Error())
-		return
-	}
-
-	dbStructure.Users[user.ID] = user
-	err = config.db.WriteDB(dbStructure)
-	if err != nil {
 		respondWithError(w, 500, err.Error())
 		return
 	}
@@ -164,6 +160,15 @@ func (config *apiConfig) saveUserHandler(w http.ResponseWriter, req *http.Reques
 	respondWithJSON(w, 201, response)
 }
 
+/*
+route: /api/login
+method: POST
+
+	req body shape: {
+		email string
+		password string
+	}
+*/
 func (config *apiConfig) loginUsersHandler(w http.ResponseWriter, req *http.Request) {
 	params, err := decodeJSON(req)
 	if err != nil {
@@ -171,25 +176,14 @@ func (config *apiConfig) loginUsersHandler(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	// load DB into memory
-	dbStructure, err := config.db.LoadDB()
+	foundUser, err := findUser(config.db, params.Email)
+
 	if err != nil {
-		respondWithError(w, 500, err.Error())
-		return
-	}
-
-	foundUser := User{}
-	found := false
-
-	for id := range dbStructure.Users {
-		if params.Email == dbStructure.Users[id].Email {
-			foundUser = dbStructure.Users[id]
-			found = true
-			break
+		if err.Error() == "user not found" {
+			respondWithError(w, 404, err.Error())
+			return
 		}
-	}
-	if !found {
-		respondWithError(w, 404, "user not found")
+		respondWithError(w, 500, err.Error())
 		return
 	}
 
