@@ -5,13 +5,19 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type parameters struct {
-	Body     string `json:"body"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Body             string `json:"body"`
+	Email            string `json:"email"`
+	Password         string `json:"password"`
+	ExpiresInSeconds int    `json:"expires_in_seconds"`
 }
 
 func saveChirpToDB(db *DB, body string) (Chirp, error) {
@@ -140,4 +146,54 @@ func findUser(db *DB, email string) (User, error) {
 
 	return foundUser, nil
 
+}
+
+func createJWT(secretKey string, expirationTime, userId int) (string, error) {
+	if expirationTime == 0 {
+		expirationTime = 86400
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		Issuer:    "chirpy",
+		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * time.Duration(expirationTime)).UTC()),
+		Subject:   strconv.Itoa(userId),
+	})
+	s, err := token.SignedString([]byte(secretKey))
+
+	if err != nil {
+		return "", err
+	}
+
+	return s, nil
+}
+
+func validateToken(jwtToken string) (int, error) {
+	token, err := jwt.ParseWithClaims(jwtToken, &jwt.RegisteredClaims{},
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(os.Getenv("JWT_SECRET")), nil
+		})
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := token.Claims.GetSubject()
+	if err != nil {
+		return 0, errors.New("error getting user id")
+	}
+
+	numberId, err := strconv.Atoi(id)
+	if err != nil {
+		return 0, errors.New("error converting id to integer")
+	}
+
+	return numberId, nil
+}
+
+func updateUserInDB(db *DB, id int, email, password string) (User, error) {
+	user, err := db.UpdateUserById(id, email, password)
+	if err != nil {
+		return User{}, err
+	}
+
+	return user, nil
 }

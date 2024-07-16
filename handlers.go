@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -11,6 +12,7 @@ import (
 type apiConfig struct {
 	fileServerHits int
 	db             *DB
+	jwtSecret      string
 }
 
 /*
@@ -193,12 +195,67 @@ func (config *apiConfig) loginUsersHandler(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
+	token, err := createJWT(config.jwtSecret, params.ExpiresInSeconds, foundUser.ID)
+
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
 	response := struct {
 		ID    int    `json:"id"`
 		Email string `json:"email"`
+		Token string `json:"token"`
 	}{
 		ID:    foundUser.ID,
 		Email: foundUser.Email,
+		Token: token,
+	}
+
+	respondWithJSON(w, 200, response)
+}
+
+/*
+route: /api/users
+method: PUT
+
+	req body shape: {
+		email string
+		password string
+	}
+
+	req headers: {
+		Authorization string (jwtToken)
+	}
+*/
+func (config *apiConfig) updateUsersHandler(w http.ResponseWriter, req *http.Request) {
+	jwtToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	id, err := validateToken(jwtToken)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	params, err := decodeJSON(req)
+	if err != nil {
+		respondWithError(w, 500, "error decoding request body")
+		return
+	}
+
+	updatedUser, err := updateUserInDB(config.db, id, params.Email, params.Password)
+	if err != nil {
+		respondWithError(w, 500, "error updating user")
+		return
+	}
+
+	response := struct {
+		ID    int    `json:"id"`
+		Email string `json:"email"`
+		Token string `json:"token"`
+	}{
+		ID:    id,
+		Email: updatedUser.Email,
+		Token: jwtToken,
 	}
 
 	respondWithJSON(w, 200, response)

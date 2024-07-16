@@ -4,10 +4,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	err := runServer()
+	err := godotenv.Load("keys.env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	err = runServer()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -23,6 +31,7 @@ func runServer() error {
 	config := &apiConfig{
 		fileServerHits: 0,
 		db:             db,
+		jwtSecret:      os.Getenv("JWT_SECRET"),
 	}
 	registerHandlers(serveMux, config)
 
@@ -50,4 +59,5 @@ func registerHandlers(serveMux *http.ServeMux, config *apiConfig) {
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}", config.getChirpByIdHandler)
 	serveMux.HandleFunc("POST /api/users", config.saveUserHandler)
 	serveMux.HandleFunc("POST /api/login", config.loginUsersHandler)
+	serveMux.HandleFunc("PUT /api/users", config.updateUsersHandler)
 }

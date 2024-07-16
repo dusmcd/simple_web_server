@@ -174,3 +174,31 @@ func (db *DB) CreateUser(email, password string) (User, error) {
 
 	return user, nil
 }
+
+func (db *DB) UpdateUserById(id int, email, password string) (User, error) {
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	user, found := dbStructure.Users[id]
+	if !found {
+		return User{}, errors.New("invalid id")
+	}
+
+	user.Email = email
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 5)
+	if err != nil {
+		return User{}, err
+	}
+
+	user.Password = string(hashedPassword)
+
+	dbStructure.Users[id] = user
+	err = db.WriteDB(dbStructure)
+	if err != nil {
+		return User{}, err
+	}
+
+	return user, nil
+}
