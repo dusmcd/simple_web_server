@@ -30,6 +30,7 @@ type User struct {
 	Email        string       `json:"email"`
 	Password     string       `json:"password"`
 	RefreshToken RefreshToken `json:"refresh_token"`
+	IsChirpyRed  bool         `json:"is_chirpy_red"`
 }
 
 type RefreshToken struct {
@@ -176,9 +177,10 @@ func (db *DB) CreateUser(email, password string) (User, error) {
 	}
 
 	user := User{
-		ID:       id,
-		Email:    email,
-		Password: string(hashedPassword),
+		ID:          id,
+		Email:       email,
+		Password:    string(hashedPassword),
+		IsChirpyRed: false,
 	}
 
 	return user, nil

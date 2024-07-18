@@ -32,6 +32,7 @@ func runServer() error {
 		fileServerHits: 0,
 		db:             db,
 		jwtSecret:      os.Getenv("JWT_SECRET"),
+		polkaKey:       os.Getenv("POLKA_KEY"),
 	}
 	registerHandlers(serveMux, config)
 
@@ -63,4 +64,5 @@ func registerHandlers(serveMux *http.ServeMux, config *apiConfig) {
 	serveMux.HandleFunc("POST /api/refresh", config.refreshTokenHandler)
 	serveMux.HandleFunc("POST /api/revoke", config.revokeRefreshHandler)
 	serveMux.HandleFunc("DELETE /api/chirps/{chirpID}", config.deleteChirpHandler)
+	serveMux.HandleFunc("POST /api/polka/webhooks", config.webhookHandler)
 }

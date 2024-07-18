@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
@@ -15,6 +14,7 @@ type apiConfig struct {
 	fileServerHits int
 	db             *DB
 	jwtSecret      string
+	polkaKey       string
 }
 
 /*
@@ -163,11 +163,13 @@ func (config *apiConfig) saveUserHandler(w http.ResponseWriter, req *http.Reques
 
 	// removing password from response
 	response := struct {
-		ID    int    `json:"id"`
-		Email string `json:"email"`
+		ID          int    `json:"id"`
+		Email       string `json:"email"`
+		IsChirpyRed bool   `json:"is_chirpy_red"`
 	}{
-		ID:    user.ID,
-		Email: user.Email,
+		ID:          user.ID,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 	respondWithJSON(w, 201, response)
 }
@@ -223,11 +225,13 @@ func (config *apiConfig) loginUsersHandler(w http.ResponseWriter, req *http.Requ
 		Email        string `json:"email"`
 		Token        string `json:"token"`
 		RefreshToken string `json:"refresh_token"`
+		IsChirpyRed  bool   `json:"is_chirpy_red"`
 	}{
 		ID:           foundUser.ID,
 		Email:        foundUser.Email,
 		Token:        token,
 		RefreshToken: refreshToken,
+		IsChirpyRed:  foundUser.IsChirpyRed,
 	}
 
 	respondWithJSON(w, 200, response)
@@ -267,18 +271,28 @@ func (config *apiConfig) updateUsersHandler(w http.ResponseWriter, req *http.Req
 	}
 
 	response := struct {
-		ID    int    `json:"id"`
-		Email string `json:"email"`
-		Token string `json:"token"`
+		ID          int    `json:"id"`
+		Email       string `json:"email"`
+		Token       string `json:"token"`
+		IsChirpyRed bool   `json:"is_chirpy_red"`
 	}{
-		ID:    id,
-		Email: updatedUser.Email,
-		Token: jwtToken,
+		ID:          id,
+		Email:       updatedUser.Email,
+		Token:       jwtToken,
+		IsChirpyRed: updatedUser.IsChirpyRed,
 	}
 
 	respondWithJSON(w, 200, response)
 }
 
+/*
+route: /api/refresh
+method: POST
+
+	req headers: {
+		Authorization string (jwtToken)
+	}
+*/
 func (config *apiConfig) refreshTokenHandler(w http.ResponseWriter, req *http.Request) {
 	refreshToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
 	validToken, userId := validateRefreshToken(config.db, refreshToken)
@@ -288,7 +302,7 @@ func (config *apiConfig) refreshTokenHandler(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	newToken, err := createJWT(os.Getenv("JWT_SECRET"), userId)
+	newToken, err := createJWT(config.jwtSecret, userId)
 	if err != nil {
 		respondWithError(w, 500, err.Error())
 		return
@@ -299,6 +313,14 @@ func (config *apiConfig) refreshTokenHandler(w http.ResponseWriter, req *http.Re
 	}{Token: newToken})
 }
 
+/*
+route: /api/revoke
+method: POST
+
+	req headers: {
+		Authorization: string (JWT)
+	}
+*/
 func (config *apiConfig) revokeRefreshHandler(w http.ResponseWriter, req *http.Request) {
 	refreshToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
 	err := deleteRefreshTokenFromDB(config.db, refreshToken)
@@ -310,6 +332,14 @@ func (config *apiConfig) revokeRefreshHandler(w http.ResponseWriter, req *http.R
 	w.WriteHeader(204)
 }
 
+/*
+route: /api/chirps
+method: DELETE
+
+	req headers: {
+		Authorization: string (JWT)
+	}
+*/
 func (config *apiConfig) deleteChirpHandler(w http.ResponseWriter, req *http.Request) {
 	jwtToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
 	id, err := validateToken(jwtToken)
@@ -335,6 +365,47 @@ func (config *apiConfig) deleteChirpHandler(w http.ResponseWriter, req *http.Req
 	if err != nil {
 		respondWithError(w, 500, err.Error())
 		return
+	}
+
+	w.WriteHeader(204)
+}
+
+/*
+route: /api/polka/webhooks
+method: POST
+
+	req body shape: {
+		event: string
+		data: {
+			user_id: int
+		}
+	}
+*/
+func (config *apiConfig) webhookHandler(w http.ResponseWriter, req *http.Request) {
+	key := strings.TrimPrefix(req.Header.Get("Authorization"), "ApiKey ")
+	if key != config.polkaKey {
+		respondWithError(w, 401, "unauthorized request")
+		return
+	}
+
+	params, err := decodeJSON(req)
+	if err != nil {
+		respondWithError(w, 500, "error decoding json")
+		return
+	}
+
+	if params.Event != "user.upgraded" {
+		w.WriteHeader(204)
+		return
+	}
+
+	err = upgradeUserInDB(config.db, params.Data.UserID)
+	if err != nil {
+		if err.Error() == "user not found" {
+			respondWithError(w, 404, err.Error())
+			return
+		}
+		respondWithError(w, 500, err.Error())
 	}
 
 	w.WriteHeader(204)

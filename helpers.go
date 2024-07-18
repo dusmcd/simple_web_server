@@ -20,6 +20,14 @@ type parameters struct {
 	Email            string `json:"email"`
 	Password         string `json:"password"`
 	ExpiresInSeconds int    `json:"expires_in_seconds"`
+	webhookParameters
+}
+
+type webhookParameters struct {
+	Event string `json:"event"`
+	Data  struct {
+		UserID int `json:"user_id"`
+	} `json:"data"`
 }
 
 func saveChirpToDB(db *DB, body string, authorID int) (Chirp, error) {
@@ -274,6 +282,28 @@ func deleteChirpFromDB(db *DB, chirpID int) error {
 	}
 
 	delete(dbStructure.Chirps, chirpID)
+
+	err = db.WriteDB(dbStructure)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func upgradeUserInDB(db *DB, userID int) error {
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return err
+	}
+
+	user, found := dbStructure.Users[userID]
+	if !found {
+		return errors.New("user not found")
+	}
+
+	user.IsChirpyRed = true
+	dbStructure.Users[userID] = user
 
 	err = db.WriteDB(dbStructure)
 	if err != nil {
