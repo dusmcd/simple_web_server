@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -301,6 +302,36 @@ func (config *apiConfig) refreshTokenHandler(w http.ResponseWriter, req *http.Re
 func (config *apiConfig) revokeRefreshHandler(w http.ResponseWriter, req *http.Request) {
 	refreshToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
 	err := deleteRefreshTokenFromDB(config.db, refreshToken)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	w.WriteHeader(204)
+}
+
+func (config *apiConfig) deleteChirpHandler(w http.ResponseWriter, req *http.Request) {
+	jwtToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	id, err := validateToken(jwtToken)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	chirpID := req.PathValue("chirpID")
+	chirp, err := config.db.GetChirpById(chirpID)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	if id != chirp.AuthorID {
+		respondWithError(w, 403, "you are not authorized to delete this chirp")
+		return
+	}
+
+	chirpIDNum, _ := strconv.Atoi(chirpID)
+	err = deleteChirpFromDB(config.db, chirpIDNum)
 	if err != nil {
 		respondWithError(w, 500, err.Error())
 		return

@@ -62,4 +62,5 @@ func registerHandlers(serveMux *http.ServeMux, config *apiConfig) {
 	serveMux.HandleFunc("PUT /api/users", config.updateUsersHandler)
 	serveMux.HandleFunc("POST /api/refresh", config.refreshTokenHandler)
 	serveMux.HandleFunc("POST /api/revoke", config.revokeRefreshHandler)
+	serveMux.HandleFunc("DELETE /api/chirps/{chirpID}", config.deleteChirpHandler)
 }

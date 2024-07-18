@@ -262,3 +262,23 @@ func deleteRefreshTokenFromDB(db *DB, refreshToken string) error {
 
 	return nil
 }
+
+func deleteChirpFromDB(db *DB, chirpID int) error {
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return err
+	}
+	_, found := dbStructure.Chirps[chirpID]
+	if !found {
+		return errors.New("chirp does not exist")
+	}
+
+	delete(dbStructure.Chirps, chirpID)
+
+	err = db.WriteDB(dbStructure)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
