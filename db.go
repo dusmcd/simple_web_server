@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -24,11 +25,17 @@ type Chirp struct {
 }
 
 type User struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	ID           int          `json:"id"`
+	Email        string       `json:"email"`
+	Password     string       `json:"password"`
+	RefreshToken RefreshToken `json:"refresh_token"`
 }
 
+type RefreshToken struct {
+	Token      string    `json:"token"`
+	CreatedAt  time.Time `json:"created_at"`
+	DaysActive int       `json:"days_active"`
+}
 type DBStructure struct {
 	Chirps map[int]Chirp `json:"chirps"`
 	Users  map[int]User  `json:"users"`

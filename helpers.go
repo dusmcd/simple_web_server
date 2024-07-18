@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log"
@@ -148,14 +150,11 @@ func findUser(db *DB, email string) (User, error) {
 
 }
 
-func createJWT(secretKey string, expirationTime, userId int) (string, error) {
-	if expirationTime == 0 {
-		expirationTime = 86400
-	}
+func createJWT(secretKey string, userId int) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Issuer:    "chirpy",
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * time.Duration(expirationTime)).UTC()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour).UTC()),
 		Subject:   strconv.Itoa(userId),
 	})
 	s, err := token.SignedString([]byte(secretKey))
@@ -196,4 +195,70 @@ func updateUserInDB(db *DB, id int, email, password string) (User, error) {
 	}
 
 	return user, nil
+}
+
+func generateRefreshToken() string {
+	bytes := make([]byte, 32)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
+}
+
+func saveRefreshToken(db *DB, userId int) (string, error) {
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return "", err
+	}
+
+	user, found := dbStructure.Users[userId]
+	if !found {
+		return "", errors.New("user not found")
+	}
+
+	token := generateRefreshToken()
+	refreshToken := RefreshToken{
+		Token:      token,
+		CreatedAt:  time.Now().UTC(),
+		DaysActive: 60,
+	}
+	user.RefreshToken = refreshToken
+	dbStructure.Users[userId] = user
+
+	err = db.WriteDB(dbStructure)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+
+}
+
+func validateRefreshToken(db *DB, refreshToken string) (bool, int) {
+	dbStructure, _ := db.LoadDB()
+
+	for userId := range dbStructure.Users {
+		if refreshToken == dbStructure.Users[userId].RefreshToken.Token {
+			return true, userId
+		}
+	}
+
+	return false, 0
+}
+
+func deleteRefreshTokenFromDB(db *DB, refreshToken string) error {
+	dbStructure, err := db.LoadDB()
+	if err != nil {
+		return err
+	}
+
+	for userId := range dbStructure.Users {
+		if refreshToken == dbStructure.Users[userId].RefreshToken.Token {
+			user := dbStructure.Users[userId]
+			user.RefreshToken = RefreshToken{}
+			dbStructure.Users[userId] = user
+			db.WriteDB(dbStructure)
+			return nil
+		}
+	}
+
+	return nil
 }

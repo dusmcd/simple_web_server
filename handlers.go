@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -195,21 +196,29 @@ func (config *apiConfig) loginUsersHandler(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	token, err := createJWT(config.jwtSecret, params.ExpiresInSeconds, foundUser.ID)
+	token, err := createJWT(config.jwtSecret, foundUser.ID)
 
 	if err != nil {
 		respondWithError(w, 500, err.Error())
 		return
 	}
 
+	refreshToken, err := saveRefreshToken(config.db, foundUser.ID)
+	if err != nil {
+		respondWithError(w, 500, "error generating refresh token")
+		return
+	}
+
 	response := struct {
-		ID    int    `json:"id"`
-		Email string `json:"email"`
-		Token string `json:"token"`
+		ID           int    `json:"id"`
+		Email        string `json:"email"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}{
-		ID:    foundUser.ID,
-		Email: foundUser.Email,
-		Token: token,
+		ID:           foundUser.ID,
+		Email:        foundUser.Email,
+		Token:        token,
+		RefreshToken: refreshToken,
 	}
 
 	respondWithJSON(w, 200, response)
@@ -259,4 +268,35 @@ func (config *apiConfig) updateUsersHandler(w http.ResponseWriter, req *http.Req
 	}
 
 	respondWithJSON(w, 200, response)
+}
+
+func (config *apiConfig) refreshTokenHandler(w http.ResponseWriter, req *http.Request) {
+	refreshToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	validToken, userId := validateRefreshToken(config.db, refreshToken)
+
+	if !validToken {
+		respondWithError(w, 401, "refresh token is invalid")
+		return
+	}
+
+	newToken, err := createJWT(os.Getenv("JWT_SECRET"), userId)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	respondWithJSON(w, 200, struct {
+		Token string `json:"token"`
+	}{Token: newToken})
+}
+
+func (config *apiConfig) revokeRefreshHandler(w http.ResponseWriter, req *http.Request) {
+	refreshToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	err := deleteRefreshTokenFromDB(config.db, refreshToken)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	w.WriteHeader(204)
 }

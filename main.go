@@ -60,4 +60,6 @@ func registerHandlers(serveMux *http.ServeMux, config *apiConfig) {
 	serveMux.HandleFunc("POST /api/users", config.saveUserHandler)
 	serveMux.HandleFunc("POST /api/login", config.loginUsersHandler)
 	serveMux.HandleFunc("PUT /api/users", config.updateUsersHandler)
+	serveMux.HandleFunc("POST /api/refresh", config.refreshTokenHandler)
+	serveMux.HandleFunc("POST /api/revoke", config.revokeRefreshHandler)
 }
