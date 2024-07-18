@@ -72,6 +72,14 @@ method: POST
 	}
 */
 func (config *apiConfig) saveChirpsHandler(w http.ResponseWriter, req *http.Request) {
+	jwtToken := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	id, err := validateToken(jwtToken)
+
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
 	params, err := decodeJSON(req)
 	if err != nil {
 		log.Print(err)
@@ -84,7 +92,7 @@ func (config *apiConfig) saveChirpsHandler(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	chirp, err := saveChirpToDB(config.db, cleanMessage(params.Body))
+	chirp, err := saveChirpToDB(config.db, cleanMessage(params.Body), id)
 	if err != nil {
 		respondWithError(w, 500, err.Error())
 		return

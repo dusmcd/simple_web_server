@@ -22,8 +22,8 @@ type parameters struct {
 	ExpiresInSeconds int    `json:"expires_in_seconds"`
 }
 
-func saveChirpToDB(db *DB, body string) (Chirp, error) {
-	chirp, err := db.CreateChirp(body)
+func saveChirpToDB(db *DB, body string, authorID int) (Chirp, error) {
+	chirp, err := db.CreateChirp(body, authorID)
 	if err != nil {
 		return Chirp{}, err
 	}
