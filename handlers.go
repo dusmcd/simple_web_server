@@ -103,11 +103,15 @@ func (config *apiConfig) saveChirpsHandler(w http.ResponseWriter, req *http.Requ
 }
 
 /*
-route: /api/chirps
+route: /api/chirps?author_id={optional}&sort={asc | desc | optional}
 method: GET
 */
 func (config *apiConfig) getChirpsHandler(w http.ResponseWriter, req *http.Request) {
-	chirps, err := config.db.GetChirps()
+	authorID := req.URL.Query().Get("author_id")
+	authorIDnum, _ := strconv.Atoi(authorID)
+	sort := req.URL.Query().Get("sort")
+
+	chirps, err := config.db.GetChirps(authorIDnum, sort)
 	if err != nil {
 		respondWithError(w, 500, err.Error())
 		return
